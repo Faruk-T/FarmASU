@@ -3,6 +3,7 @@ using System.IO;
 using FarmASU.Inventory;
 using FarmASU.Player;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace FarmASU.Core
 {
@@ -59,14 +60,14 @@ namespace FarmASU.Core
 
         private void Update()
         {
-            if (_enableDebugKeybinds)
+            if (_enableDebugKeybinds && Keyboard.current != null)
             {
-                if (Input.GetKeyDown(KeyCode.F5))
+                if (Keyboard.current.f5Key.wasPressedThisFrame)
                 {
                     Debug.Log("[SaveManager] F5 pressed: Quick-Saving game...");
                     SaveGame(0);
                 }
-                else if (Input.GetKeyDown(KeyCode.F9))
+                else if (Keyboard.current.f9Key.wasPressedThisFrame)
                 {
                     Debug.Log("[SaveManager] F9 pressed: Quick-Loading game...");
                     LoadGame(0);
@@ -78,7 +79,7 @@ namespace FarmASU.Core
         {
             if (_playerController == null)
             {
-                _playerController = FindFirstObjectByType<PlayerController>();
+                _playerController = FindAnyObjectByType<PlayerController>();
             }
 
             if (_inventoryController == null && _playerController != null)
@@ -88,7 +89,7 @@ namespace FarmASU.Core
 
             if (_inventoryController == null)
             {
-                _inventoryController = FindFirstObjectByType<InventoryController>();
+                _inventoryController = FindAnyObjectByType<InventoryController>();
             }
         }
 
