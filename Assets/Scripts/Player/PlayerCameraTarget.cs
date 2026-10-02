@@ -34,22 +34,38 @@ namespace FarmASU.Player
 
         private float _yaw;
         private float _pitch = 15.0f; // Default pleasant downward viewing angle
+        private Transform _targetToFollow;
 
         private void Awake()
         {
             // Initialize yaw with current target rotation
             _yaw = transform.eulerAngles.y;
             _pitch = 15.0f;
+
+            if (transform.parent != null)
+            {
+                _targetToFollow = transform.parent;
+                // Detach from parent so the character's body rotation never twists the camera target!
+                transform.SetParent(null);
+            }
+
             UpdateRotation();
         }
 
         private void LateUpdate()
         {
-            // Maintain stable height offset relative to parent player transform
-            if (transform.parent != null)
+            if (_targetToFollow == null)
             {
-                transform.position = transform.parent.position + Vector3.up * _targetHeight;
+                // If tracked character is destroyed, clean up this target
+                Destroy(gameObject);
+                return;
             }
+
+            // Maintain stable height offset relative to tracked character transform
+            transform.position = _targetToFollow.position + Vector3.up * _targetHeight;
+
+            // Always enforce world rotation every frame so character body rotation never drags camera
+            UpdateRotation();
         }
 
         /// <summary>
