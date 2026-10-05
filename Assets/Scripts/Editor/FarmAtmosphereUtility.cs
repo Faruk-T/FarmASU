@@ -160,8 +160,114 @@ namespace FarmASU.Editor
             // 8. Configure atmospheric sunlight and fog
             ConfigureValleyAtmosphere();
 
+            // 9. Calibrate grass/flower heights down to human scale & clear farmstead yard
+            CalibrateGrassScaleAndClearYard();
+
             EditorSceneManager.MarkSceneDirty(mainScene);
             Debug.Log("[ValleySetup] === VAST VALLEY WORLD SETUP COMPLETE! ===");
+        }
+
+        [MenuItem("FarmASU/Calibrate Grass Scale & Clear Farmstead Yard", false, 1)]
+        public static void CalibrateGrassScaleAndClearYard()
+        {
+            Terrain terrain = Object.FindAnyObjectByType<Terrain>();
+            if (terrain == null || terrain.terrainData == null)
+            {
+                Debug.LogWarning("[GrassCalibration] No active Terrain found in scene!");
+                return;
+            }
+
+            TerrainData td = terrain.terrainData;
+            Undo.RecordObject(td, "Calibrate Grass & Clear Yard");
+
+            // 1. Rescale Grass & Flower Prototypes to natural human proportions
+            // (ankle to knee height: grass ~0.30m - 0.52m, flowers ~0.40m - 0.70m)
+            DetailPrototype[] prototypes = td.detailPrototypes;
+            for (int i = 0; i < prototypes.Length; i++)
+            {
+                string name = prototypes[i].prototypeTexture != null ? prototypes[i].prototypeTexture.name.ToLower() : "";
+                if (name.Contains("flower"))
+                {
+                    prototypes[i].minHeight = 0.40f;
+                    prototypes[i].maxHeight = 0.70f;
+                    prototypes[i].minWidth = 0.40f;
+                    prototypes[i].maxWidth = 0.65f;
+                }
+                else
+                {
+                    prototypes[i].minHeight = 0.30f;
+                    prototypes[i].maxHeight = 0.52f;
+                    prototypes[i].minWidth = 0.30f;
+                    prototypes[i].maxWidth = 0.55f;
+                }
+            }
+            td.detailPrototypes = prototypes;
+
+            // 2. Clear grass/flowers from under the cottage, well, table, and main walking pathway
+            Vector3 tPos = terrain.transform.position;
+            Vector3 tSize = td.size;
+            int dWidth = td.detailWidth;
+            int dHeight = td.detailHeight;
+
+            // Centers to clear: (worldPos, radius, fadeRadius)
+            var clearZones = new (Vector3 center, float innerRadius, float outerRadius)[]
+            {
+                // Cottage footprint
+                (new Vector3(2.5f, 0, 16.0f), 5.5f, 8.0f),
+                // Water well
+                (new Vector3(-2.5f, 0, 11.5f), 2.5f, 4.0f),
+                // Crafting table & woodcutter
+                (new Vector3(-4.5f, 0, 13.5f), 3.5f, 5.5f),
+                // Entrance clearing & signpost
+                (new Vector3(2.5f, 0, 5.0f), 2.2f, 3.5f),
+                // Pathway midpoints
+                (new Vector3(2.2f, 0, 9.0f), 1.6f, 2.8f),
+                (new Vector3(1.8f, 0, 12.0f), 1.8f, 3.0f),
+                (new Vector3(0.0f, 0, 11.0f), 1.5f, 2.5f)
+            };
+
+            for (int layer = 0; layer < prototypes.Length; layer++)
+            {
+                int[,] map = td.GetDetailLayer(0, 0, dWidth, dHeight, layer);
+
+                foreach (var zone in clearZones)
+                {
+                    float normX = (zone.center.x - tPos.x) / tSize.x;
+                    float normZ = (zone.center.z - tPos.z) / tSize.z;
+                    int cX = Mathf.RoundToInt(normX * dWidth);
+                    int cZ = Mathf.RoundToInt(normZ * dHeight);
+
+                    int rInner = Mathf.CeilToInt((zone.innerRadius / tSize.x) * dWidth);
+                    int rOuter = Mathf.CeilToInt((zone.outerRadius / tSize.x) * dWidth);
+
+                    int xMin = Mathf.Clamp(cX - rOuter, 0, dWidth - 1);
+                    int xMax = Mathf.Clamp(cX + rOuter, 0, dWidth - 1);
+                    int zMin = Mathf.Clamp(cZ - rOuter, 0, dHeight - 1);
+                    int zMax = Mathf.Clamp(cZ + rOuter, 0, dHeight - 1);
+
+                    for (int z = zMin; z <= zMax; z++)
+                    {
+                        for (int x = xMin; x <= xMax; x++)
+                        {
+                            float distPx = Mathf.Sqrt((x - cX) * (x - cX) + (z - cZ) * (z - cZ));
+                            if (distPx <= rInner)
+                            {
+                                map[z, x] = 0;
+                            }
+                            else if (distPx <= rOuter && map[z, x] > 0)
+                            {
+                                float t = (distPx - rInner) / (rOuter - rInner);
+                                map[z, x] = Mathf.RoundToInt(map[z, x] * t);
+                            }
+                        }
+                    }
+                }
+
+                td.SetDetailLayer(0, 0, layer, map);
+            }
+
+            EditorUtility.SetDirty(td);
+            Debug.Log("[GrassCalibration] SUCCESS: Calibrated grass/flower heights to human scale and cleared farmstead yard & pathways!");
         }
 
         private static void ConfigureValleyAtmosphere()
