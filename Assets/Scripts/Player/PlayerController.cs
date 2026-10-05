@@ -34,6 +34,10 @@ namespace FarmASU.Player
         [Tooltip("Constant downward force applied while grounded to stick to uneven terrain.")]
         [SerializeField] private float _groundedStickForce = -2.5f;
 
+        [Header("Jump Tuning")]
+        [Tooltip("Initial jump height in meters.")]
+        [SerializeField] private float _jumpHeight = 1.3f;
+
         [Header("Component References")]
         [Tooltip("Reference to the camera follow target script.")]
         [SerializeField] private PlayerCameraTarget _cameraTarget;
@@ -127,6 +131,7 @@ namespace FarmASU.Player
 
             // Apply dampening for smooth crossfades (prevents abrupt stopping or instant snapping)
             _animator.SetFloat("Speed", targetBlendSpeed, 0.15f, Time.deltaTime);
+            _animator.SetBool("IsGrounded", _characterController.isGrounded);
         }
 
         private void ReadInput()
@@ -192,10 +197,25 @@ namespace FarmASU.Player
                 );
             }
 
-            // 4. Grounding and Gravity calculation
-            if (_characterController.isGrounded)
+            // 4. Grounding, Jumping and Gravity calculation
+            bool isGrounded = _characterController.isGrounded;
+            bool jumpRequested = (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
+                || (_inputActions != null && _inputActions.Player.Dodge.WasPressedThisFrame());
+
+            if (isGrounded)
             {
-                _verticalVelocity = _groundedStickForce;
+                if (jumpRequested)
+                {
+                    _verticalVelocity = Mathf.Sqrt(2.0f * Mathf.Abs(_gravity) * _jumpHeight);
+                    if (_animator != null)
+                    {
+                        _animator.SetTrigger("Jump");
+                    }
+                }
+                else
+                {
+                    _verticalVelocity = _groundedStickForce;
+                }
             }
             else
             {

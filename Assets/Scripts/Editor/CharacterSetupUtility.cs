@@ -8,8 +8,8 @@ namespace FarmASU.Editor
 {
     /// <summary>
     /// Utility to configure the newly imported Peasant Man FBX model and animations.
-    /// Sets Humanoid rigs, enables looping on Walk/Run/Idle clips, maps the URP Lit material,
-    /// and generates a 1D Locomotion Blend Tree Animator Controller.
+    /// Sets Humanoid rigs, enables looping on Walk/Run/Idle clips, non-looping on Jump,
+    /// maps the URP Lit material, and generates a Locomotion & Jump Animator Controller.
     /// </summary>
     public static class CharacterSetupUtility
     {
@@ -18,6 +18,7 @@ namespace FarmASU.Editor
         private const string IdlePath = CharactersFolder + "/Peasant Man@Happy Idle.fbx";
         private const string WalkPath = CharactersFolder + "/Peasant Man@Dwarf Walk.fbx";
         private const string RunPath = CharactersFolder + "/Peasant Man@Fast Run.fbx";
+        private const string JumpPath = CharactersFolder + "/Peasant Man@Jump.fbx";
         private const string ControllerPath = CharactersFolder + "/PlayerAnimator.controller";
         private const string MaterialPath = CharactersFolder + "/M_PeasantMan.mat";
 
@@ -61,25 +62,30 @@ namespace FarmASU.Editor
             ConfigureAnimation(IdlePath, mainAvatar, "HappyIdle", true);
             ConfigureAnimation(WalkPath, mainAvatar, "DwarfWalk", true);
             ConfigureAnimation(RunPath, mainAvatar, "FastRun", true);
+            if (File.Exists(JumpPath))
+            {
+                ConfigureAnimation(JumpPath, mainAvatar, "Jump", false);
+            }
 
             // 3. Extract Animation Clips
             AnimationClip idleClip = LoadAnimationClip(IdlePath);
             AnimationClip walkClip = LoadAnimationClip(WalkPath);
             AnimationClip runClip = LoadAnimationClip(RunPath);
+            AnimationClip jumpClip = File.Exists(JumpPath) ? LoadAnimationClip(JumpPath) : null;
 
             if (idleClip == null || walkClip == null || runClip == null)
             {
-                Debug.LogError("[CharacterSetup] Could not load all required animation clips.");
+                Debug.LogError("[CharacterSetup] Could not load required walk/run/idle animation clips.");
                 return;
             }
 
-            // 4. Create Animator Controller with 1D Blend Tree
-            CreateLocomotionController(idleClip, walkClip, runClip);
+            // 4. Create Animator Controller with 1D Blend Tree + Jump State
+            CreateLocomotionController(idleClip, walkClip, runClip, jumpClip);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log("[CharacterSetup] SUCCESS! Peasant Man character, Humanoid rigs, and Locomotion Blend Tree successfully configured!");
+            Debug.Log("[CharacterSetup] SUCCESS! Peasant Man character, Humanoid rigs, and Locomotion/Jump Blend Tree successfully configured!");
         }
 
         [MenuItem("FarmASU/Attach Peasant Man to Player in Scene")]
@@ -174,6 +180,7 @@ namespace FarmASU.Editor
 
             foreach (var clip in clips)
             {
+                clip.name = clipName;
                 clip.loopTime = loop;
                 clip.lockRootRotation = true;
                 clip.lockRootHeightY = true;
@@ -198,7 +205,7 @@ namespace FarmASU.Editor
             return null;
         }
 
-        private static void CreateLocomotionController(AnimationClip idle, AnimationClip walk, AnimationClip run)
+        private static void CreateLocomotionController(AnimationClip idle, AnimationClip walk, AnimationClip run, AnimationClip jump)
         {
             if (File.Exists(ControllerPath))
             {
@@ -207,10 +214,12 @@ namespace FarmASU.Editor
 
             AnimatorController controller = AnimatorController.CreateAnimatorControllerAtPath(ControllerPath);
             controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
+            controller.AddParameter("IsGrounded", AnimatorControllerParameterType.Bool);
+            controller.AddParameter("Jump", AnimatorControllerParameterType.Trigger);
 
             AnimatorStateMachine rootStateMachine = controller.layers[0].stateMachine;
 
-            // Create 1D Blend Tree for Locomotion
+            // 1. Create 1D Blend Tree for Locomotion
             BlendTree blendTree;
             AnimatorState locomotionState = controller.CreateBlendTreeInController("Locomotion", out blendTree, 0);
             rootStateMachine.defaultState = locomotionState;
@@ -224,7 +233,32 @@ namespace FarmASU.Editor
             blendTree.AddChild(walk, 0.5f);
             blendTree.AddChild(run, 1.0f);
 
-            Debug.Log($"[CharacterSetup] Created Animator Controller with 1D Blend Tree at: {ControllerPath}");
+            // 2. Create Jump State & Transitions
+            if (jump != null)
+            {
+                AnimatorState jumpState = rootStateMachine.AddState("Jump", new Vector3(300, 50, 0));
+                jumpState.motion = jump;
+
+                // Locomotion -> Jump transition (on Jump Trigger)
+                AnimatorStateTransition toJumpTrigger = locomotionState.AddTransition(jumpState);
+                toJumpTrigger.AddCondition(AnimatorConditionMode.If, 0, "Jump");
+                toJumpTrigger.duration = 0.08f;
+                toJumpTrigger.hasExitTime = false;
+
+                // Locomotion -> Jump transition (falling off ledge / not grounded)
+                AnimatorStateTransition toJumpFall = locomotionState.AddTransition(jumpState);
+                toJumpFall.AddCondition(AnimatorConditionMode.IfNot, 0, "IsGrounded");
+                toJumpFall.duration = 0.15f;
+                toJumpFall.hasExitTime = false;
+
+                // Jump -> Locomotion transition (when grounded again / landing)
+                AnimatorStateTransition toLocomotion = jumpState.AddTransition(locomotionState);
+                toLocomotion.AddCondition(AnimatorConditionMode.If, 0, "IsGrounded");
+                toLocomotion.duration = 0.15f;
+                toLocomotion.hasExitTime = false;
+            }
+
+            Debug.Log($"[CharacterSetup] Created Animator Controller with Locomotion & Jump at: {ControllerPath}");
         }
     }
 }
