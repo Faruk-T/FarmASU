@@ -12,14 +12,17 @@ namespace FarmASU.Player
     public class PlayerController : MonoBehaviour
     {
         [Header("Movement Tuning")]
-        [Tooltip("Maximum movement speed in meters per second.")]
-        [SerializeField] private float _moveSpeed = 4.5f;
+        [Tooltip("Standard walking speed in meters per second.")]
+        [SerializeField] private float _walkSpeed = 2.2f;
+
+        [Tooltip("Running / sprinting speed in meters per second.")]
+        [SerializeField] private float _runSpeed = 4.5f;
 
         [Tooltip("Acceleration rate towards maximum speed.")]
-        [SerializeField] private float _acceleration = 14.0f;
+        [SerializeField] private float _acceleration = 8.0f;
 
         [Tooltip("Deceleration rate when stopping.")]
-        [SerializeField] private float _deceleration = 18.0f;
+        [SerializeField] private float _deceleration = 8.0f;
 
         [Tooltip("Rotation speed in degrees per second.")]
         [SerializeField] private float _rotationSpeed = 720.0f;
@@ -37,6 +40,9 @@ namespace FarmASU.Player
 
         [Tooltip("Main camera transform used for directional reference. Defaults to Camera.main.")]
         [SerializeField] private Transform _cameraTransform;
+
+        [Tooltip("Animator component controlling character locomotion.")]
+        [SerializeField] private Animator _animator;
 
         // Internal State
         private CharacterController _characterController;
@@ -58,6 +64,11 @@ namespace FarmASU.Player
             if (_cameraTarget == null)
             {
                 _cameraTarget = GetComponentInChildren<PlayerCameraTarget>();
+            }
+
+            if (_animator == null)
+            {
+                _animator = GetComponentInChildren<Animator>();
             }
 
             _inputActions = new FarmASUInputActions();
@@ -82,6 +93,40 @@ namespace FarmASU.Player
             ReadInput();
             HandleLook();
             HandleMovement();
+            UpdateAnimation();
+        }
+
+        private void UpdateAnimation()
+        {
+            if (_animator == null)
+            {
+                _animator = GetComponentInChildren<Animator>();
+                if (_animator == null)
+                {
+                    return;
+                }
+            }
+
+            // Map physical movement speed to Blend Tree thresholds:
+            // 0.0 = Happy Idle, 0.5 = Dwarf Walk, 1.0 = Fast Run
+            float targetBlendSpeed = 0.0f;
+            if (_currentSpeed > 0.05f)
+            {
+                if (_currentSpeed <= _walkSpeed)
+                {
+                    // Map [0, _walkSpeed] to [0.0, 0.5]
+                    targetBlendSpeed = Mathf.Lerp(0.0f, 0.5f, _currentSpeed / _walkSpeed);
+                }
+                else
+                {
+                    // Map (_walkSpeed, _runSpeed] to [0.5, 1.0]
+                    float sprintRatio = (_currentSpeed - _walkSpeed) / Mathf.Max(0.01f, _runSpeed - _walkSpeed);
+                    targetBlendSpeed = Mathf.Lerp(0.5f, 1.0f, Mathf.Clamp01(sprintRatio));
+                }
+            }
+
+            // Apply dampening for smooth crossfades (prevents abrupt stopping or instant snapping)
+            _animator.SetFloat("Speed", targetBlendSpeed, 0.15f, Time.deltaTime);
         }
 
         private void ReadInput()
@@ -129,8 +174,10 @@ namespace FarmASU.Player
             Vector3 targetDirection = (camForward * _moveInput.y + camRight * _moveInput.x);
             bool hasMovementInput = _moveInput.sqrMagnitude > 0.01f;
 
-            // 2. Smoothly accelerate / decelerate speed
-            float targetSpeed = hasMovementInput ? _moveSpeed : 0.0f;
+            // 2. Smoothly accelerate / decelerate speed (supports walking and Left Shift sprint)
+            bool isSprinting = Keyboard.current != null && (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed);
+            float maxMoveSpeed = isSprinting ? _runSpeed : _walkSpeed;
+            float targetSpeed = hasMovementInput ? maxMoveSpeed : 0.0f;
             float accelRate = targetSpeed > _currentSpeed ? _acceleration : _deceleration;
             _currentSpeed = Mathf.MoveTowards(_currentSpeed, targetSpeed, accelRate * Time.deltaTime);
 
