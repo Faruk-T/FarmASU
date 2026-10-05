@@ -383,7 +383,7 @@ MonoBehaviour:
   _rotationSpeed: 720
   _gravity: -18
   _groundedStickForce: -2.5
-  _jumpHeight: 1.3
+  _jumpHeight: 0.75
   _cameraTarget: {fileID: 5000013}
   _cameraTransform: {fileID: 330585546}
   _animator: {fileID: 0}

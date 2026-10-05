@@ -36,7 +36,7 @@ namespace FarmASU.Player
 
         [Header("Jump Tuning")]
         [Tooltip("Initial jump height in meters.")]
-        [SerializeField] private float _jumpHeight = 1.3f;
+        [SerializeField] private float _jumpHeight = 0.75f;
 
         [Header("Component References")]
         [Tooltip("Reference to the camera follow target script.")]
