@@ -135,7 +135,8 @@ namespace FarmASU.Player
 
             // Apply dampening for smooth crossfades (prevents abrupt stopping or instant snapping)
             _animator.SetFloat("Speed", targetBlendSpeed, 0.15f, Time.deltaTime);
-            _animator.SetBool("IsGrounded", _characterController.isGrounded);
+            bool groundedForAnim = _characterController.isGrounded && _verticalVelocity <= 0.1f;
+            _animator.SetBool("IsGrounded", groundedForAnim);
         }
 
         private void ReadInput()
