@@ -20,43 +20,43 @@ namespace FarmASU.Editor
         private const string MaterialsFolder = PackFolder + "/Materials";
 
         // Accurate human scale factors calibrated against Peasant Man (1.8m tall):
-        // Table: ~0.81m waist height | Stool: ~0.44m knee height | Well: ~2.2m overhead roof, 0.84m stone rim
-        // Broom: ~1.36m chest height | Axe: ~0.76m hand axe | Pointer: ~2.17m eye level signpost
-        // House: ~6.43m cozy 2-story cottage | Vessels/Mugs: ~0.25m - 0.35m realistic table jugs
+        // Table: ~0.89m standard waist work height | Stool: ~0.48m chair height | Well: ~2.5m overhead roof, 0.95m stone rim
+        // Broom: ~1.45m chest height | Axe: ~0.82m hand axe | Pointer: ~2.4m signpost
+        // House: ~7.4m cozy 2-story cottage with 2.1m clear entrance door | Vessels: ~0.24m realistic table jugs
         private static readonly (string prefabName, Vector3 pos, Vector3 rot, Vector3 scale, bool isMeshCollider, bool isConvex)[] Items = new[]
         {
-            // 1. Cozy Cottage (scaled to 70% -> 6.4m tall, 4.5m wide, 5.5m deep)
-            ("Witchs_house", new Vector3(2.5f, 0.0f, 16.0f), Vector3.zero, new Vector3(0.70f, 0.70f, 0.70f), true, false),
+            // 1. Cozy Cottage (scaled to 80% -> 7.4m tall, 5.1m wide, 6.3m deep, door ~2.1m)
+            ("Witchs_house", new Vector3(2.5f, 0.0f, 16.0f), Vector3.zero, new Vector3(0.80f, 0.80f, 0.80f), true, false),
 
-            // 2. Stone Water Well (scaled to 48% -> 2.2m total height, stone rim at waist level)
-            ("well", new Vector3(-2.5f, 0.0f, 11.5f), new Vector3(0, 35.0f, 0), new Vector3(0.48f, 0.48f, 0.48f), true, false),
+            // 2. Stone Water Well (scaled to 54% -> 2.5m total height, stone rim at waist level)
+            ("well", new Vector3(-2.5f, 0.0f, 11.5f), new Vector3(0, 35.0f, 0), new Vector3(0.54f, 0.54f, 0.54f), true, false),
 
-            // 3. Outdoor Dining / Crafting Table & Stool (table top at Y = 0.81m)
-            ("table", new Vector3(-5.0f, 0.0f, 12.0f), new Vector3(0, -20.0f, 0), new Vector3(0.42f, 0.42f, 0.42f), true, true),
-            ("stool", new Vector3(-4.0f, 0.0f, 12.3f), new Vector3(0, 45.0f, 0), new Vector3(0.50f, 0.50f, 0.50f), true, true),
+            // 3. Outdoor Dining / Crafting Table & Stool (table top at Y = 0.89m)
+            ("table", new Vector3(-5.0f, 0.0f, 12.0f), new Vector3(0, -20.0f, 0), new Vector3(0.46f, 0.46f, 0.46f), true, true),
+            ("stool", new Vector3(-4.0f, 0.0f, 12.3f), new Vector3(0, 45.0f, 0), new Vector3(0.54f, 0.54f, 0.54f), true, true),
 
-            // 4. Tabletop Decor (flush on top of table at Y = 0.81m)
-            ("vessel", new Vector3(-4.8f, 0.81f, 12.0f), Vector3.zero, new Vector3(0.18f, 0.18f, 0.18f), false, false),
-            ("vessel_1", new Vector3(-5.2f, 0.81f, 11.8f), Vector3.zero, new Vector3(0.22f, 0.22f, 0.22f), false, false),
-            ("vessel_2", new Vector3(-5.3f, 0.81f, 12.2f), Vector3.zero, new Vector3(0.22f, 0.22f, 0.22f), false, false),
-            ("vessel_3", new Vector3(-4.3f, 0.00f, 11.3f), Vector3.zero, new Vector3(0.22f, 0.22f, 0.22f), false, false), // on ground by table
+            // 4. Tabletop Decor (flush on top of table at Y = 0.89m)
+            ("vessel", new Vector3(-4.8f, 0.89f, 12.0f), Vector3.zero, new Vector3(0.20f, 0.20f, 0.20f), false, false),
+            ("vessel_1", new Vector3(-5.2f, 0.89f, 11.8f), Vector3.zero, new Vector3(0.24f, 0.24f, 0.24f), false, false),
+            ("vessel_2", new Vector3(-5.3f, 0.89f, 12.2f), Vector3.zero, new Vector3(0.24f, 0.24f, 0.24f), false, false),
+            ("vessel_3", new Vector3(-4.3f, 0.00f, 11.3f), Vector3.zero, new Vector3(0.24f, 0.24f, 0.24f), false, false), // on ground by table
 
             // 5. Woodcutter Station (stacked logs, chopped wood, hand axe)
-            ("frewood", new Vector3(-3.5f, 0.0f, 15.5f), new Vector3(0, 25.0f, 0), new Vector3(0.55f, 0.55f, 0.55f), true, true),
-            ("frewood_1", new Vector3(-4.8f, 0.0f, 15.0f), new Vector3(0, -35.0f, 0), new Vector3(0.55f, 0.55f, 0.55f), true, true),
-            ("axe", new Vector3(-4.1f, 0.0f, 15.2f), new Vector3(0, 45.0f, 0), new Vector3(0.35f, 0.35f, 0.35f), false, false),
+            ("frewood", new Vector3(-3.5f, 0.0f, 15.5f), new Vector3(0, 25.0f, 0), new Vector3(0.60f, 0.60f, 0.60f), true, true),
+            ("frewood_1", new Vector3(-4.8f, 0.0f, 15.0f), new Vector3(0, -35.0f, 0), new Vector3(0.60f, 0.60f, 0.60f), true, true),
+            ("axe", new Vector3(-4.1f, 0.0f, 15.2f), new Vector3(0, 45.0f, 0), new Vector3(0.38f, 0.38f, 0.38f), false, false),
 
             // 6. Porch & Entrance Props (Broom leaning by door, notice board, stone path)
-            ("Broom", new Vector3(0.9f, 0.0f, 13.8f), new Vector3(0, 20.0f, -8.0f), new Vector3(0.30f, 0.30f, 0.30f), false, false),
-            ("Board", new Vector3(-0.5f, 0.0f, 14.0f), new Vector3(0, -30.0f, 0), new Vector3(0.45f, 0.45f, 0.45f), true, true),
-            ("Stones", new Vector3(1.5f, 0.02f, 10.0f), Vector3.zero, new Vector3(0.65f, 0.65f, 0.65f), false, false),
+            ("Broom", new Vector3(0.9f, 0.0f, 13.8f), new Vector3(0, 20.0f, -8.0f), new Vector3(0.34f, 0.34f, 0.34f), false, false),
+            ("Board", new Vector3(-0.5f, 0.0f, 14.0f), new Vector3(0, -30.0f, 0), new Vector3(0.50f, 0.50f, 0.50f), true, true),
+            ("Stones", new Vector3(1.5f, 0.02f, 10.0f), Vector3.zero, new Vector3(0.70f, 0.70f, 0.70f), false, false),
 
             // 7. Cauldron / Vat & Scoop
-            ("vat", new Vector3(-2.8f, 0.0f, 17.5f), Vector3.zero, new Vector3(0.35f, 0.35f, 0.35f), true, true),
-            ("scoop", new Vector3(-2.4f, 0.05f, 17.0f), new Vector3(0, 30.0f, 0), new Vector3(0.35f, 0.35f, 0.35f), false, false),
+            ("vat", new Vector3(-2.8f, 0.0f, 17.5f), Vector3.zero, new Vector3(0.38f, 0.38f, 0.38f), true, true),
+            ("scoop", new Vector3(-2.4f, 0.05f, 17.0f), new Vector3(0, 30.0f, 0), new Vector3(0.38f, 0.38f, 0.38f), false, false),
 
-            // 8. Directional Wooden Signpost (eye level at 2.17m)
-            ("Pointer", new Vector3(2.5f, 0.0f, 5.0f), new Vector3(0, -60.0f, 0), new Vector3(0.25f, 0.25f, 0.25f), true, true)
+            // 8. Directional Wooden Signpost (eye level at 2.4m)
+            ("Pointer", new Vector3(2.5f, 0.0f, 5.0f), new Vector3(0, -60.0f, 0), new Vector3(0.28f, 0.28f, 0.28f), true, true)
         };
 
         [MenuItem("FarmASU/Setup Farm House & Environment in Scene")]
