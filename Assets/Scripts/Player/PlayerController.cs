@@ -68,6 +68,10 @@ namespace FarmASU.Player
             if (_cameraTarget == null)
             {
                 _cameraTarget = GetComponentInChildren<PlayerCameraTarget>();
+                if (_cameraTarget == null)
+                {
+                    _cameraTarget = FindAnyObjectByType<PlayerCameraTarget>();
+                }
             }
 
             if (_animator == null)
@@ -150,7 +154,11 @@ namespace FarmASU.Player
         {
             if (_cameraTarget == null)
             {
-                return;
+                _cameraTarget = FindAnyObjectByType<PlayerCameraTarget>();
+                if (_cameraTarget == null)
+                {
+                    return;
+                }
             }
 
             bool isGamepad = Gamepad.current != null &&
@@ -164,6 +172,11 @@ namespace FarmASU.Player
             // 1. Resolve camera-relative horizontal movement direction
             Vector3 camForward = Vector3.forward;
             Vector3 camRight = Vector3.right;
+
+            if (_cameraTransform == null && Camera.main != null)
+            {
+                _cameraTransform = Camera.main.transform;
+            }
 
             if (_cameraTransform != null)
             {

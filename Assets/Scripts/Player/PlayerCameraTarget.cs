@@ -1,10 +1,12 @@
 using UnityEngine;
+using Unity.Cinemachine;
 
 namespace FarmASU.Player
 {
     /// <summary>
     /// Manages the orientation and positioning of the camera follow target.
-    /// Orbit rotations (yaw and pitch) are applied here so Cinemachine can track it cleanly.
+    /// Orbit rotations (yaw and pitch) are applied here so Cinemachine can track it cleanly
+    /// without inheriting the player character's body rotation (preventing spinning feedback loops).
     /// </summary>
     public class PlayerCameraTarget : MonoBehaviour
     {
@@ -36,6 +38,11 @@ namespace FarmASU.Player
         private float _pitch = 15.0f; // Default pleasant downward viewing angle
         private Transform _targetToFollow;
 
+        public void SetTarget(Transform target)
+        {
+            _targetToFollow = target;
+        }
+
         private void Awake()
         {
             // Initialize yaw with current target rotation
@@ -48,17 +55,47 @@ namespace FarmASU.Player
                 // Detach from parent so the character's body rotation never twists the camera target!
                 transform.SetParent(null);
             }
+            else if (_targetToFollow == null)
+            {
+                GameObject player = GameObject.FindWithTag("Player");
+                if (player != null)
+                {
+                    _targetToFollow = player.transform;
+                }
+            }
 
             UpdateRotation();
+        }
+
+        private void Start()
+        {
+            // Ensure Cinemachine is tracking THIS target and NOT the rotating character mesh/root
+            var vcam = FindAnyObjectByType<CinemachineCamera>();
+            if (vcam != null)
+            {
+                if (vcam.Target.TrackingTarget == null || (_targetToFollow != null && vcam.Target.TrackingTarget == _targetToFollow))
+                {
+                    vcam.Target.TrackingTarget = transform;
+                    vcam.Target.LookAtTarget = null;
+                    vcam.Target.CustomLookAtTarget = false;
+                    Debug.Log("[PlayerCameraTarget] Automatically connected Cinemachine TrackingTarget to CameraTarget.");
+                }
+            }
         }
 
         private void LateUpdate()
         {
             if (_targetToFollow == null)
             {
-                // If tracked character is destroyed, clean up this target
-                Destroy(gameObject);
-                return;
+                GameObject player = GameObject.FindWithTag("Player");
+                if (player != null)
+                {
+                    _targetToFollow = player.transform;
+                }
+                else
+                {
+                    return; // Wait safely without destroying self
+                }
             }
 
             // Maintain stable height offset relative to tracked character transform
@@ -104,12 +141,17 @@ namespace FarmASU.Player
 
         private void UpdateRotation()
         {
-            transform.rotation = Quaternion.Euler(_pitch, _yaw, 0f);
+            transform.rotation = Quaternion.Euler(_pitch, _yaw, 0.0f);
         }
 
         /// <summary>
-        /// Returns current yaw angle for camera alignment calculations.
+        /// Exposes current yaw rotation angle for orientation alignment.
         /// </summary>
-        public float CurrentYaw => _yaw;
+        public float Yaw => _yaw;
+
+        /// <summary>
+        /// Exposes current pitch angle for debugging or vertical offset logic.
+        /// </summary>
+        public float Pitch => _pitch;
     }
 }

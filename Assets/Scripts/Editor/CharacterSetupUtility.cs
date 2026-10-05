@@ -1,15 +1,18 @@
 #if UNITY_EDITOR
 using System.IO;
+using FarmASU.Player;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
+using Unity.Cinemachine;
 
 namespace FarmASU.Editor
 {
     /// <summary>
     /// Utility to configure the newly imported Peasant Man FBX model and animations.
     /// Sets Humanoid rigs, enables looping on Walk/Run/Idle clips, non-looping on Jump,
-    /// maps the URP Lit material, and generates a Locomotion & Jump Animator Controller.
+    /// maps the URP Lit material, generates a Locomotion & Jump Animator Controller,
+    /// and provides complete one-click player hierarchy & camera repairs.
     /// </summary>
     public static class CharacterSetupUtility
     {
@@ -91,34 +94,85 @@ namespace FarmASU.Editor
         [MenuItem("FarmASU/Attach Peasant Man to Player in Scene")]
         public static void AttachCharacterToPlayerInScene()
         {
+            // 1. Locate or create Player GameObject
             GameObject playerObj = GameObject.FindWithTag("Player");
             if (playerObj == null)
             {
-                Debug.LogError("[CharacterSetup] No GameObject with tag 'Player' found in the open scene!");
-                return;
+                playerObj = GameObject.Find("Player");
             }
 
-            // Hide old placeholder capsule
+            if (playerObj == null)
+            {
+                Debug.LogWarning("[CharacterSetup] Player GameObject not found by tag or name. Searching for Peasant Man root...");
+                GameObject standalonePeasant = GameObject.Find("Peasant Man");
+                if (standalonePeasant != null && standalonePeasant.transform.parent == null)
+                {
+                    playerObj = new GameObject("Player");
+                    playerObj.transform.position = standalonePeasant.transform.position;
+                    standalonePeasant.transform.SetParent(playerObj.transform);
+                }
+                else
+                {
+                    playerObj = new GameObject("Player");
+                    playerObj.transform.position = Vector3.zero;
+                }
+            }
+
+            playerObj.tag = "Player";
+            int playerLayer = LayerMask.NameToLayer("Player");
+            if (playerLayer != -1)
+            {
+                playerObj.layer = playerLayer;
+            }
+
+            // Ensure PlayerController & CharacterController are present
+            CharacterController cc = playerObj.GetComponent<CharacterController>();
+            if (cc == null)
+            {
+                cc = playerObj.AddComponent<CharacterController>();
+                cc.height = 2.0f;
+                cc.radius = 0.4f;
+                cc.center = new Vector3(0, 1.0f, 0);
+                cc.stepOffset = 0.3f;
+            }
+
+            PlayerController pc = playerObj.GetComponent<PlayerController>();
+            if (pc == null)
+            {
+                pc = playerObj.AddComponent<PlayerController>();
+            }
+
+            // 2. Hide or remove old placeholder capsule / cylinder
             Transform oldVisual = playerObj.transform.Find("Visual");
             if (oldVisual != null)
             {
-                oldVisual.gameObject.SetActive(false);
-                Debug.Log("[CharacterSetup] Disabled placeholder 'Visual' capsule.");
+                Object.DestroyImmediate(oldVisual.gameObject);
+                Debug.Log("[CharacterSetup] Removed old placeholder 'Visual' cylinder/capsule.");
             }
 
-            // Find or instantiate Peasant Man child
+            // 3. Find or instantiate Peasant Man child
             Transform peasantTransform = playerObj.transform.Find("Peasant Man");
             GameObject peasantInstance;
             if (peasantTransform == null)
             {
-                GameObject peasantPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath);
-                if (peasantPrefab == null)
+                // Check if Peasant Man was dropped into scene root
+                GameObject rootPeasant = GameObject.Find("Peasant Man");
+                if (rootPeasant != null && rootPeasant != playerObj && rootPeasant.transform.parent == null)
                 {
-                    Debug.LogError($"[CharacterSetup] Could not load prefab at {ModelPath}");
-                    return;
+                    peasantInstance = rootPeasant;
+                    peasantInstance.transform.SetParent(playerObj.transform);
                 }
-                peasantInstance = (GameObject)PrefabUtility.InstantiatePrefab(peasantPrefab, playerObj.transform);
-                peasantInstance.name = "Peasant Man";
+                else
+                {
+                    GameObject peasantPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath);
+                    if (peasantPrefab == null)
+                    {
+                        Debug.LogError($"[CharacterSetup] Could not load prefab at {ModelPath}");
+                        return;
+                    }
+                    peasantInstance = (GameObject)PrefabUtility.InstantiatePrefab(peasantPrefab, playerObj.transform);
+                    peasantInstance.name = "Peasant Man";
+                }
             }
             else
             {
@@ -152,8 +206,44 @@ namespace FarmASU.Editor
                 }
             }
 
+            // 4. Ensure CameraTarget exists and is configured
+            Transform cameraTargetTransform = playerObj.transform.Find("CameraTarget");
+            if (cameraTargetTransform == null)
+            {
+                GameObject camTargetObj = GameObject.Find("CameraTarget");
+                if (camTargetObj != null && camTargetObj.transform.parent == null)
+                {
+                    cameraTargetTransform = camTargetObj.transform;
+                }
+                else
+                {
+                    GameObject newTarget = new GameObject("CameraTarget");
+                    newTarget.transform.SetParent(playerObj.transform);
+                    newTarget.transform.localPosition = new Vector3(0, 1.4f, 0);
+                    cameraTargetTransform = newTarget.transform;
+                }
+            }
+
+            PlayerCameraTarget cameraTarget = cameraTargetTransform.GetComponent<PlayerCameraTarget>();
+            if (cameraTarget == null)
+            {
+                cameraTarget = cameraTargetTransform.gameObject.AddComponent<PlayerCameraTarget>();
+            }
+
+            // 5. Connect Cinemachine Tracking Target
+            var vcam = Object.FindAnyObjectByType<CinemachineCamera>();
+            if (vcam != null)
+            {
+                vcam.Target.TrackingTarget = cameraTargetTransform;
+                vcam.Target.LookAtTarget = null;
+                vcam.Target.CustomLookAtTarget = false;
+                EditorUtility.SetDirty(vcam);
+                Debug.Log("[CharacterSetup] Reconnected CinemachineCamera TrackingTarget to CameraTarget.");
+            }
+
+            EditorUtility.SetDirty(playerObj);
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(playerObj.scene);
-            Debug.Log("[CharacterSetup] Successfully attached Peasant Man to Player with Animator and Material!");
+            Debug.Log("[CharacterSetup] SUCCESS: Full Player Hierarchy & Camera connection repaired successfully!");
         }
 
         private static void ConfigureAnimation(string path, Avatar avatar, string clipName, bool loop)
