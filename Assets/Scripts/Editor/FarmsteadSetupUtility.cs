@@ -33,7 +33,17 @@ namespace FarmASU.Editor
                 Debug.Log("[FarmsteadSetup] Removed previous [Farmstead] hierarchy.");
             }
 
-            // 2. Create clean Farmstead parent
+            // 2. Expand Ground plane so there is a vast, beautiful farm pasture (80m x 80m)
+            GameObject ground = GameObject.Find("Ground_TestPlane_20x20");
+            if (ground != null)
+            {
+                Undo.RecordObject(ground.transform, "Expand Ground for Farmstead");
+                ground.transform.localScale = new Vector3(8.0f, 1.0f, 8.0f);
+                ground.transform.position = new Vector3(0.0f, 0.0f, 15.0f);
+                Debug.Log("[FarmsteadSetup] Expanded Ground plane to 80x80 meters.");
+            }
+
+            // 3. Create clean Farmstead parent
             GameObject farmsteadRoot = new GameObject("[Farmstead]");
             Undo.RegisterCreatedObjectUndo(farmsteadRoot, "Create [Farmstead]");
             farmsteadRoot.transform.position = Vector3.zero;
