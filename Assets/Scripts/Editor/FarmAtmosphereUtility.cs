@@ -177,53 +177,52 @@ namespace FarmASU.Editor
                 return;
             }
 
+            terrain.detailObjectDensity = 1.0f;
+            terrain.detailObjectDistance = 150f;
+
             TerrainData td = terrain.terrainData;
             Undo.RecordObject(td, "Calibrate Grass & Clear Yard");
 
-            // 1. Rescale Grass & Flower Prototypes to natural human proportions
-            // (ankle to knee height: grass ~0.30m - 0.52m, flowers ~0.40m - 0.70m)
+            // 1. Rescale Grass & Flower Prototypes to lush, full, knee-height proportions
+            // Wide tufts (0.65m - 0.95m) ensure dense, thick meadow coverage without sparse gaps
             DetailPrototype[] prototypes = td.detailPrototypes;
             for (int i = 0; i < prototypes.Length; i++)
             {
                 string name = prototypes[i].prototypeTexture != null ? prototypes[i].prototypeTexture.name.ToLower() : "";
                 if (name.Contains("flower"))
                 {
-                    prototypes[i].minHeight = 0.40f;
-                    prototypes[i].maxHeight = 0.70f;
-                    prototypes[i].minWidth = 0.40f;
-                    prototypes[i].maxWidth = 0.65f;
+                    prototypes[i].minHeight = 0.60f;
+                    prototypes[i].maxHeight = 0.95f;
+                    prototypes[i].minWidth = 0.65f;
+                    prototypes[i].maxWidth = 0.95f;
                 }
                 else
                 {
-                    prototypes[i].minHeight = 0.30f;
-                    prototypes[i].maxHeight = 0.52f;
-                    prototypes[i].minWidth = 0.30f;
-                    prototypes[i].maxWidth = 0.55f;
+                    prototypes[i].minHeight = 0.50f;
+                    prototypes[i].maxHeight = 0.80f;
+                    prototypes[i].minWidth = 0.65f;
+                    prototypes[i].maxWidth = 0.95f;
                 }
             }
             td.detailPrototypes = prototypes;
 
-            // 2. Clear grass/flowers from under the cottage, well, table, and main walking pathway
+            // 2. Clear only the immediate physical footprint under house and well,
+            // leaving lush grass hugging closely around the farmstead
             Vector3 tPos = terrain.transform.position;
             Vector3 tSize = td.size;
             int dWidth = td.detailWidth;
             int dHeight = td.detailHeight;
 
-            // Centers to clear: (worldPos, radius, fadeRadius)
             var clearZones = new (Vector3 center, float innerRadius, float outerRadius)[]
             {
-                // Cottage footprint
-                (new Vector3(2.5f, 0, 16.0f), 5.5f, 8.0f),
-                // Water well
-                (new Vector3(-2.5f, 0, 11.5f), 2.5f, 4.0f),
-                // Crafting table & woodcutter
-                (new Vector3(-4.5f, 0, 13.5f), 3.5f, 5.5f),
-                // Entrance clearing & signpost
-                (new Vector3(2.5f, 0, 5.0f), 2.2f, 3.5f),
-                // Pathway midpoints
-                (new Vector3(2.2f, 0, 9.0f), 1.6f, 2.8f),
-                (new Vector3(1.8f, 0, 12.0f), 1.8f, 3.0f),
-                (new Vector3(0.0f, 0, 11.0f), 1.5f, 2.5f)
+                // Immediate cottage footprint (walls and floor)
+                (new Vector3(2.5f, 0, 16.0f), 2.8f, 4.2f),
+                // Immediate well rim
+                (new Vector3(-2.5f, 0, 11.5f), 1.2f, 2.0f),
+                // Dining table
+                (new Vector3(-5.0f, 0, 12.0f), 1.2f, 2.0f),
+                // Woodcutter chopping block
+                (new Vector3(-4.0f, 0, 15.2f), 1.0f, 1.8f)
             };
 
             for (int layer = 0; layer < prototypes.Length; layer++)
