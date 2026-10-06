@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -33,6 +34,117 @@ namespace FarmASU.Editor
         private const string ValleyAssetFolder = "Assets/Art/Environment";
         private const string TerrainDataAssetPath = ValleyAssetFolder + "/FarmValleyTerrainData.asset";
 
+        [MenuItem("FarmASU/⭐ Bu Açık Olan Çiçekli Araziyi MainScene'e Aktar", false, -10)]
+        public static void TransferOpenDemoTerrainIntoMainScene()
+        {
+            Terrain sourceTerrain = Object.FindAnyObjectByType<Terrain>();
+            if (sourceTerrain == null || sourceTerrain.terrainData == null)
+            {
+                Debug.LogError("[TerrainTransfer] Lütfen DemoGrassFlowers sahnesi açıkken bu butona tıklayın!");
+                return;
+            }
+
+            Debug.Log($"[TerrainTransfer] Kaynak arazi bulundu: '{sourceTerrain.name}', detay sayısı: {sourceTerrain.terrainData.detailPrototypes.Length}");
+
+            if (!Directory.Exists(ValleyAssetFolder))
+            {
+                Directory.CreateDirectory(ValleyAssetFolder);
+                AssetDatabase.Refresh();
+            }
+
+            // 1. Orijinal arazinin TerrainData'sını birebir kopyala
+            TerrainData clonedData = Object.Instantiate(sourceTerrain.terrainData);
+            clonedData.name = "FarmValleyTerrainData";
+
+            // Detay haritalarını (tüm çiçek ve çim dağılımını) eksiksiz klonla
+            int dWidth = sourceTerrain.terrainData.detailWidth;
+            int dHeight = sourceTerrain.terrainData.detailHeight;
+            clonedData.SetDetailResolution(dWidth, sourceTerrain.terrainData.detailResolutionPerPatch);
+            clonedData.detailPrototypes = sourceTerrain.terrainData.detailPrototypes;
+            for (int i = 0; i < sourceTerrain.terrainData.detailPrototypes.Length; i++)
+            {
+                int[,] map = sourceTerrain.terrainData.GetDetailLayer(0, 0, dWidth, dHeight, i);
+                clonedData.SetDetailLayer(0, 0, i, map);
+            }
+
+            // Diske kaydet
+            if (File.Exists(TerrainDataAssetPath))
+            {
+                AssetDatabase.DeleteAsset(TerrainDataAssetPath);
+            }
+            AssetDatabase.CreateAsset(clonedData, TerrainDataAssetPath);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+
+            Material terrainMat = sourceTerrain.materialTemplate;
+            float detailDist = sourceTerrain.detailObjectDistance;
+            float detailDensity = sourceTerrain.detailObjectDensity;
+            float treeDist = sourceTerrain.treeDistance;
+
+            // 2. Şimdi MainScene sahnesini aç
+            Scene mainScene = EditorSceneManager.OpenScene(MainScenePath, OpenSceneMode.Single);
+
+            TerrainData loadedData = AssetDatabase.LoadAssetAtPath<TerrainData>(TerrainDataAssetPath);
+            if (loadedData == null) loadedData = clonedData;
+
+            // 3. Eski düz zemin ve eski objeleri temizle
+            GameObject oldPlane = GameObject.Find("Ground_TestPlane_20x20");
+            if (oldPlane != null) Undo.DestroyObjectImmediate(oldPlane);
+
+            GameObject oldEnv = GameObject.Find("[Farm_Environment]");
+            if (oldEnv != null) Undo.DestroyObjectImmediate(oldEnv);
+
+            GameObject oldTerrainObj = GameObject.Find("Terrain_FarmValley");
+            if (oldTerrainObj != null) Undo.DestroyObjectImmediate(oldTerrainObj);
+
+            // 4. Yeni araziyi oluştur
+            GameObject terrainObj = Terrain.CreateTerrainGameObject(loadedData);
+            terrainObj.name = "Terrain_FarmValley";
+            Undo.RegisterCreatedObjectUndo(terrainObj, "Create Farm Valley Terrain");
+
+            Terrain terrain = terrainObj.GetComponent<Terrain>();
+            terrain.drawTreesAndFoliage = true;
+            terrain.detailObjectDistance = Mathf.Max(detailDist, 250f);
+            terrain.detailObjectDensity = Mathf.Max(detailDensity, 1.0f);
+            terrain.treeDistance = Mathf.Max(treeDist, 500f);
+            if (terrainMat != null) terrain.materialTemplate = terrainMat;
+
+            Vector3 tSize = loadedData.size;
+            float tPosX = -tSize.x * 0.5f;
+            float tPosZ = -tSize.z * 0.5f + 15.0f;
+            terrainObj.transform.position = new Vector3(tPosX, 0.0f, tPosZ);
+
+            // 5. Çiftlik evini ve objeleri yerleştir
+            FarmsteadSetupUtility.SetupFarmstead();
+            GameObject farmstead = GameObject.Find("[Farmstead]");
+            if (farmstead != null)
+            {
+                float fY = terrain.SampleHeight(new Vector3(2.5f, 0, 16.0f)) + terrainObj.transform.position.y;
+                farmstead.transform.position = new Vector3(0, fY, 0);
+            }
+
+            // 6. Oyuncuyu yerleştir
+            GameObject player = GameObject.Find("Player");
+            if (player != null)
+            {
+                Undo.RecordObject(player.transform, "Position Player on Valley");
+                float pY = terrain.SampleHeight(player.transform.position) + terrainObj.transform.position.y;
+                player.transform.position = new Vector3(player.transform.position.x, Mathf.Max(pY + 0.1f, 0.1f), player.transform.position.z);
+            }
+
+            ConfigureValleyAtmosphere();
+
+            // 7. Sadece evin tam oturduğu alt tabanı temizle, çiçekler evin etrafını sarsın
+            CalibrateGrassScaleAndClearYard();
+
+            // 8. Envanter HUD ve eşyaları bağla
+            InventoryHUDSetupUtility.SetupInventoryHUDInMainScene();
+
+            EditorSceneManager.MarkSceneDirty(mainScene);
+            EditorSceneManager.SaveScene(mainScene);
+            Debug.Log("[TerrainTransfer] === TEBRİKLER! ÇİÇEKLİ VE ÇİMENLİ DEMO ARAZİSİ BİREBİR MAİNSCENE'E AKTARILDI! ===");
+        }
+
         [MenuItem("FarmASU/Setup Valley World in MainScene", false, 0)]
         public static void SetupValleyWorldInMainScene()
         {
@@ -50,55 +162,10 @@ namespace FarmASU.Editor
                 mainScene = EditorSceneManager.OpenScene(MainScenePath, OpenSceneMode.Single);
             }
 
-            // 1. Open DemoGrassFlowers additively to extract Terrain
-            Scene demoScene = EditorSceneManager.OpenScene(DemoScenePath, OpenSceneMode.Additive);
-            if (!demoScene.IsValid())
-            {
-                Debug.LogError($"[ValleySetup] Could not open demo scene at {DemoScenePath}");
-                return;
-            }
+            // 1. Build the rich native Valley TerrainData directly with lush grass and flowers
+            TerrainData terrainData = BuildNativeValleyTerrainData(TerrainDataAssetPath);
 
-            Terrain demoTerrain = null;
-            GameObject[] demoRoots = demoScene.GetRootGameObjects();
-            foreach (var root in demoRoots)
-            {
-                Terrain t = root.GetComponentInChildren<Terrain>();
-                if (t != null)
-                {
-                    demoTerrain = t;
-                    break;
-                }
-            }
-
-            if (demoTerrain == null || demoTerrain.terrainData == null)
-            {
-                Debug.LogError("[ValleySetup] Could not find Terrain in DemoGrassFlowers scene!");
-                EditorSceneManager.CloseScene(demoScene, true);
-                return;
-            }
-
-            Debug.Log($"[ValleySetup] Found Demo Terrain: size={demoTerrain.terrainData.size}");
-
-            // 2. Clone TerrainData so MainScene has its own independent asset
-            TerrainData clonedData = Object.Instantiate(demoTerrain.terrainData);
-            clonedData.name = "FarmValleyTerrainData";
-
-            if (File.Exists(TerrainDataAssetPath))
-            {
-                AssetDatabase.DeleteAsset(TerrainDataAssetPath);
-            }
-            AssetDatabase.CreateAsset(clonedData, TerrainDataAssetPath);
-            AssetDatabase.SaveAssets();
-
-            float detailDist = demoTerrain.detailObjectDistance;
-            float detailDensity = demoTerrain.detailObjectDensity;
-            float treeDistance = demoTerrain.treeDistance;
-            Material terrainMat = demoTerrain.materialTemplate;
-
-            // 3. Close the demo scene
-            EditorSceneManager.CloseScene(demoScene, true);
-
-            // 4. In MainScene, clean up the old flat test plane and any procedural environment
+            // 2. In MainScene, clean up any old test plane and old environment
             GameObject oldPlane = GameObject.Find("Ground_TestPlane_20x20");
             if (oldPlane != null)
             {
@@ -113,32 +180,29 @@ namespace FarmASU.Editor
                 Debug.Log("[ValleySetup] Removed old [Farm_Environment].");
             }
 
-            // 5. Create or update Terrain in MainScene
+            // 3. Create or update Terrain in MainScene
             GameObject terrainObj = GameObject.Find("Terrain_FarmValley");
             if (terrainObj != null)
             {
                 Undo.DestroyObjectImmediate(terrainObj);
             }
 
-            terrainObj = Terrain.CreateTerrainGameObject(clonedData);
+            terrainObj = Terrain.CreateTerrainGameObject(terrainData);
             terrainObj.name = "Terrain_FarmValley";
             Undo.RegisterCreatedObjectUndo(terrainObj, "Create Farm Valley Terrain");
 
             Terrain terrain = terrainObj.GetComponent<Terrain>();
-            terrain.detailObjectDistance = Mathf.Max(detailDist, 80f);
-            terrain.detailObjectDensity = Mathf.Clamp(detailDensity, 0.7f, 1.0f);
-            terrain.treeDistance = Mathf.Max(treeDistance, 500f);
-            if (terrainMat != null)
-            {
-                terrain.materialTemplate = terrainMat;
-            }
+            terrain.drawTreesAndFoliage = true;
+            terrain.detailObjectDistance = 250f;
+            terrain.detailObjectDensity = 1.0f;
+            terrain.treeDistance = 500f;
 
-            Vector3 tSize = clonedData.size;
+            Vector3 tSize = terrainData.size;
             float tPosX = -tSize.x * 0.5f;
             float tPosZ = -tSize.z * 0.5f + 15.0f;
             terrainObj.transform.position = new Vector3(tPosX, 0.0f, tPosZ);
 
-            // 6. Setup the Farmstead cottage and props on the valley floor
+            // 4. Setup the Farmstead cottage and props on the valley floor
             FarmsteadSetupUtility.SetupFarmstead();
 
             GameObject farmstead = GameObject.Find("[Farmstead]");
@@ -148,7 +212,7 @@ namespace FarmASU.Editor
                 farmstead.transform.position = new Vector3(0, fY, 0);
             }
 
-            // 7. Ensure Player is positioned properly on the ground
+            // 5. Ensure Player is positioned properly on the ground
             GameObject player = GameObject.Find("Player");
             if (player != null)
             {
@@ -157,14 +221,136 @@ namespace FarmASU.Editor
                 player.transform.position = new Vector3(player.transform.position.x, Mathf.Max(pY + 0.1f, 0.1f), player.transform.position.z);
             }
 
-            // 8. Configure atmospheric sunlight and fog
+            // 6. Configure atmospheric sunlight and fog
             ConfigureValleyAtmosphere();
 
-            // 9. Calibrate grass/flower heights down to human scale & clear farmstead yard
+            // 7. Calibrate grass/flower heights down to human scale & clear farmstead yard
             CalibrateGrassScaleAndClearYard();
 
             EditorSceneManager.MarkSceneDirty(mainScene);
             Debug.Log("[ValleySetup] === VAST VALLEY WORLD SETUP COMPLETE! ===");
+        }
+
+        private static TerrainData BuildNativeValleyTerrainData(string assetPath)
+        {
+            Debug.Log("[ValleySetup] Building pristine native Valley TerrainData from assets...");
+            TerrainData td = new TerrainData();
+            td.name = "FarmValleyTerrainData";
+            td.heightmapResolution = 513;
+            td.size = new Vector3(1000f, 60f, 1000f);
+
+            // 1. Generate gentle rolling valley heights
+            float[,] heights = new float[513, 513];
+            for (int z = 0; z < 513; z++)
+            {
+                float normZ = (float)z / 512f;
+                float worldZ = normZ * 1000f - 485f;
+                for (int x = 0; x < 513; x++)
+                {
+                    float normX = (float)x / 512f;
+                    float worldX = normX * 1000f - 500f;
+
+                    float dist = Mathf.Sqrt(worldX * worldX + (worldZ - 15f) * (worldZ - 15f));
+                    float hillFactor = Mathf.Clamp01((dist - 70f) / 220f);
+                    float perlin = Mathf.PerlinNoise(normX * 5.0f, normZ * 5.0f) * 0.7f + Mathf.PerlinNoise(normX * 12.0f, normZ * 12.0f) * 0.3f;
+                    heights[z, x] = hillFactor * perlin * 0.28f;
+                }
+            }
+            td.SetHeights(0, 0, heights);
+
+            // 2. Setup Terrain Layers (Grass ground)
+            string layerPath = "Assets/ALP_Assets/GrassFlowersFREE/Demo/DemoGrassFlowers/layer_Grass01_BigUVd261c09ae55ba1e3.terrainlayer";
+            TerrainLayer groundLayer = AssetDatabase.LoadAssetAtPath<TerrainLayer>(layerPath);
+            if (groundLayer == null)
+            {
+                groundLayer = new TerrainLayer();
+                groundLayer.name = "layer_Grass01_Farm";
+                Texture2D groundTex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/ALP_Assets/GrassFlowersFREE/Textures/Ground/Grass01_BigUV.png");
+                if (groundTex != null) groundLayer.diffuseTexture = groundTex;
+                groundLayer.tileSize = new Vector2(20, 20);
+                string newLayerPath = ValleyAssetFolder + "/layer_FarmGrass.terrainlayer";
+                AssetDatabase.CreateAsset(groundLayer, newLayerPath);
+            }
+            td.terrainLayers = new TerrainLayer[] { groundLayer };
+
+            // 3. Setup Detail Prototypes (12 Grass & Flower textures)
+            string grassTexFolder = "Assets/ALP_Assets/GrassFlowersFREE/Textures/GrassFlowers";
+            List<DetailPrototype> protoList = new List<DetailPrototype>();
+            if (Directory.Exists(grassTexFolder))
+            {
+                string[] texFiles = Directory.GetFiles(grassTexFolder, "*.tga");
+                System.Array.Sort(texFiles);
+                foreach (string f in texFiles)
+                {
+                    Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(f.Replace("\\", "/"));
+                    if (tex != null)
+                    {
+                        DetailPrototype dp = new DetailPrototype();
+                        dp.prototypeTexture = tex;
+                        bool isFlower = tex.name.ToLower().Contains("flower");
+                        dp.renderMode = isFlower ? DetailRenderMode.GrassBillboard : DetailRenderMode.Grass;
+                        dp.minWidth = isFlower ? 0.70f : 0.80f;
+                        dp.maxWidth = isFlower ? 1.05f : 1.20f;
+                        dp.minHeight = isFlower ? 0.70f : 0.65f;
+                        dp.maxHeight = isFlower ? 1.10f : 0.95f;
+                        dp.healthyColor = Color.white;
+                        dp.dryColor = new Color(0.92f, 0.96f, 0.88f);
+                        protoList.Add(dp);
+                    }
+                }
+            }
+
+            if (protoList.Count > 0)
+            {
+                td.detailPrototypes = protoList.ToArray();
+                td.SetDetailResolution(512, 16);
+
+                int dRes = td.detailResolution;
+                for (int l = 0; l < protoList.Count; l++)
+                {
+                    int[,] map = new int[dRes, dRes];
+                    bool isGrass = !protoList[l].prototypeTexture.name.ToLower().Contains("flower");
+                    int targetDensity = isGrass ? 16 : 8;
+
+                    for (int z = 0; z < dRes; z++)
+                    {
+                        float normZ = (float)z / (float)dRes;
+                        float worldZ = normZ * 1000f - 485f;
+                        for (int x = 0; x < dRes; x++)
+                        {
+                            float normX = (float)x / (float)dRes;
+                            float worldX = normX * 1000f - 500f;
+                            float dist = Mathf.Sqrt(worldX * worldX + (worldZ - 15f) * (worldZ - 15f));
+
+                            if (dist < 350f)
+                            {
+                                float noise = Mathf.PerlinNoise(x * 0.04f + l * 3.7f, z * 0.04f + l * 3.7f);
+                                if (isGrass)
+                                {
+                                    // Full, lush, thick wild grass meadow everywhere
+                                    map[z, x] = noise > 0.20f ? targetDensity : (targetDensity / 2);
+                                }
+                                else
+                                {
+                                    // Vibrant clusters of wildflowers scattered throughout the grass
+                                    map[z, x] = noise > 0.55f ? targetDensity : 0;
+                                }
+                            }
+                        }
+                    }
+                    td.SetDetailLayer(0, 0, l, map);
+                }
+            }
+
+            if (File.Exists(assetPath))
+            {
+                AssetDatabase.DeleteAsset(assetPath);
+            }
+            AssetDatabase.CreateAsset(td, assetPath);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+
+            return td;
         }
 
         [MenuItem("FarmASU/Calibrate Grass Scale & Clear Farmstead Yard", false, 1)]
