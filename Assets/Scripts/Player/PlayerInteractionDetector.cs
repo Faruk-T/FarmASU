@@ -152,6 +152,18 @@ namespace FarmASU.Player
         {
             if (_currentTarget != null && _currentTarget.CanInteract(gameObject))
             {
+                // Trigger pickup bending animation on character
+                PlayerController pc = GetComponent<PlayerController>();
+                if (pc != null)
+                {
+                    pc.PlayPickUpAnimation();
+                }
+                else
+                {
+                    Animator anim = GetComponentInChildren<Animator>();
+                    if (anim != null) anim.SetTrigger("PickUp");
+                }
+
                 _currentTarget.Interact(gameObject);
                 // Immediately re-scan to update prompt if target was destroyed or consumed
                 ScanForInteractables();

@@ -24,6 +24,7 @@ namespace FarmASU.Editor
         private const string JumpPath = CharactersFolder + "/Peasant Man@Jump.fbx";
         private const string ControllerPath = CharactersFolder + "/PlayerAnimator.controller";
         private const string MaterialPath = CharactersFolder + "/M_PeasantMan.mat";
+        private const string PickUpPath = CharactersFolder + "/Peasant Man@Picking Up.fbx";
 
         [MenuItem("FarmASU/Setup Character & Animations")]
         public static void SetupCharacter()
@@ -70,11 +71,37 @@ namespace FarmASU.Editor
                 ConfigureAnimation(JumpPath, mainAvatar, "Jump", false);
             }
 
+            // Optional PickUp Animation
+            string foundPickUpPath = null;
+            if (File.Exists(PickUpPath))
+            {
+                foundPickUpPath = PickUpPath;
+            }
+            else
+            {
+                string[] files = Directory.GetFiles(CharactersFolder, "*.fbx");
+                foreach (var f in files)
+                {
+                    string fLower = f.ToLower();
+                    if (fLower.Contains("pick") || fLower.Contains("gather") || fLower.Contains("lift"))
+                    {
+                        foundPickUpPath = f.Replace('\\', '/');
+                        break;
+                    }
+                }
+            }
+
+            if (foundPickUpPath != null)
+            {
+                ConfigureAnimation(foundPickUpPath, mainAvatar, "PickUp", false);
+            }
+
             // 3. Extract Animation Clips
             AnimationClip idleClip = LoadAnimationClip(IdlePath);
             AnimationClip walkClip = LoadAnimationClip(WalkPath);
             AnimationClip runClip = LoadAnimationClip(RunPath);
             AnimationClip jumpClip = File.Exists(JumpPath) ? LoadAnimationClip(JumpPath) : null;
+            AnimationClip pickUpClip = foundPickUpPath != null ? LoadAnimationClip(foundPickUpPath) : null;
 
             if (idleClip == null || walkClip == null || runClip == null)
             {
@@ -82,8 +109,8 @@ namespace FarmASU.Editor
                 return;
             }
 
-            // 4. Create Animator Controller with 1D Blend Tree + Jump State
-            CreateLocomotionController(idleClip, walkClip, runClip, jumpClip);
+            // 4. Create Animator Controller with 1D Blend Tree + Jump & PickUp States
+            CreateLocomotionController(idleClip, walkClip, runClip, jumpClip, pickUpClip);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -295,7 +322,7 @@ namespace FarmASU.Editor
             return null;
         }
 
-        private static void CreateLocomotionController(AnimationClip idle, AnimationClip walk, AnimationClip run, AnimationClip jump)
+        private static void CreateLocomotionController(AnimationClip idle, AnimationClip walk, AnimationClip run, AnimationClip jump, AnimationClip pickUp = null)
         {
             if (File.Exists(ControllerPath))
             {
@@ -306,6 +333,7 @@ namespace FarmASU.Editor
             controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
             controller.AddParameter("IsGrounded", AnimatorControllerParameterType.Bool);
             controller.AddParameter("Jump", AnimatorControllerParameterType.Trigger);
+            controller.AddParameter("PickUp", AnimatorControllerParameterType.Trigger);
 
             AnimatorStateMachine rootStateMachine = controller.layers[0].stateMachine;
 
@@ -348,7 +376,26 @@ namespace FarmASU.Editor
                 toLocomotion.hasExitTime = false;
             }
 
-            Debug.Log($"[CharacterSetup] Created Animator Controller with Locomotion & Jump at: {ControllerPath}");
+            // 3. Create PickUp State & Transitions (if motion available)
+            if (pickUp != null)
+            {
+                AnimatorState pickUpState = rootStateMachine.AddState("PickUp", new Vector3(300, 180, 0));
+                pickUpState.motion = pickUp;
+
+                // Locomotion -> PickUp transition
+                AnimatorStateTransition toPickUp = locomotionState.AddTransition(pickUpState);
+                toPickUp.AddCondition(AnimatorConditionMode.If, 0, "PickUp");
+                toPickUp.duration = 0.10f;
+                toPickUp.hasExitTime = false;
+
+                // PickUp -> Locomotion transition (after animation completes)
+                AnimatorStateTransition fromPickUp = pickUpState.AddTransition(locomotionState);
+                fromPickUp.duration = 0.15f;
+                fromPickUp.hasExitTime = true;
+                fromPickUp.exitTime = 0.85f;
+            }
+
+            Debug.Log($"[CharacterSetup] Created Animator Controller with Locomotion, Jump & PickUp at: {ControllerPath}");
         }
     }
 }

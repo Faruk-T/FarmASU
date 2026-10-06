@@ -49,6 +49,53 @@ namespace FarmASU.Player
             }
         }
 
+        private void Update()
+        {
+            if (_hotbar == null)
+            {
+                _hotbar = FindAnyObjectByType<HotbarController>();
+                if (_hotbar != null)
+                {
+                    _hotbar.OnSelectedSlotChanged += OnSelectedSlotChanged;
+                    var (slot, itemDef) = _hotbar.GetSelectedItem();
+                    UpdateHeldItem(slot, itemDef);
+                }
+            }
+        }
+
+        [Header("Mount Configuration")]
+        [Tooltip("Local offset of the mount point relative to RightHand bone (Mixamo palm center).")]
+        [SerializeField] private Vector3 _mountLocalPosition = new Vector3(-0.02f, 0.10f, 0.02f);
+        [SerializeField] private Vector3 _mountLocalRotation = Vector3.zero;
+
+        [System.Serializable]
+        public struct ItemOffsetConfig
+        {
+            public string itemId;
+            public Vector3 localPosition;
+            public Vector3 localEulerAngles;
+            public Vector3 localScale;
+        }
+
+        [Header("Per-Item Calibration")]
+        [SerializeField] private ItemOffsetConfig[] _customItemConfigs = new ItemOffsetConfig[]
+        {
+            new ItemOffsetConfig
+            {
+                itemId = "wood",
+                localPosition = new Vector3(0f, 0f, 0f),
+                localEulerAngles = new Vector3(0f, 0f, 90f),
+                localScale = new Vector3(0.35f, 0.35f, 0.35f)
+            },
+            new ItemOffsetConfig
+            {
+                itemId = "stone",
+                localPosition = new Vector3(0f, 0f, 0f),
+                localEulerAngles = Vector3.zero,
+                localScale = new Vector3(0.22f, 0.22f, 0.22f)
+            }
+        };
+
         private void FindOrCreateHandMount()
         {
             if (_handMount != null) return;
@@ -62,12 +109,14 @@ namespace FarmASU.Player
                     if (existing != null)
                     {
                         _handMount = existing;
+                        _handMount.localPosition = _mountLocalPosition;
+                        _handMount.localRotation = Quaternion.Euler(_mountLocalRotation);
                         return;
                     }
                     GameObject mount = new GameObject("HeldItemMount");
                     mount.transform.SetParent(rightHand, false);
-                    mount.transform.localPosition = new Vector3(0.06f, 0.08f, 0.02f);
-                    mount.transform.localRotation = Quaternion.Euler(0, 90f, 90f);
+                    mount.transform.localPosition = _mountLocalPosition;
+                    mount.transform.localRotation = Quaternion.Euler(_mountLocalRotation);
                     _handMount = mount.transform;
                     return;
                 }
@@ -82,7 +131,8 @@ namespace FarmASU.Player
                 {
                     GameObject mount = new GameObject("HeldItemMount");
                     mount.transform.SetParent(child, false);
-                    mount.transform.localPosition = new Vector3(0.05f, 0.05f, 0.05f);
+                    mount.transform.localPosition = _mountLocalPosition;
+                    mount.transform.localRotation = Quaternion.Euler(_mountLocalRotation);
                     _handMount = mount.transform;
                     return;
                 }
@@ -115,8 +165,15 @@ namespace FarmASU.Player
             if (_handMount != null && itemDef.HeldPrefab != null)
             {
                 _currentHeldInstance = Instantiate(itemDef.HeldPrefab, _handMount);
-                _currentHeldInstance.transform.localPosition = Vector3.zero;
-                _currentHeldInstance.transform.localRotation = Quaternion.identity;
+                
+                // Apply per-item calibration if configured
+                ItemOffsetConfig config = GetConfigFor(itemDef.Id);
+                _currentHeldInstance.transform.localPosition = config.localPosition;
+                _currentHeldInstance.transform.localRotation = Quaternion.Euler(config.localEulerAngles);
+                if (config.localScale != Vector3.zero)
+                {
+                    _currentHeldInstance.transform.localScale = config.localScale;
+                }
 
                 // Disable colliders on held item so it doesn't mess with physics or interaction
                 Collider[] cols = _currentHeldInstance.GetComponentsInChildren<Collider>();
@@ -127,6 +184,28 @@ namespace FarmASU.Player
 
                 _currentHeldItemId = itemDef.Id;
             }
+        }
+
+        private ItemOffsetConfig GetConfigFor(string itemId)
+        {
+            if (_customItemConfigs != null)
+            {
+                foreach (var cfg in _customItemConfigs)
+                {
+                    if (string.Equals(cfg.itemId, itemId, System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        return cfg;
+                    }
+                }
+            }
+
+            return new ItemOffsetConfig
+            {
+                itemId = itemId,
+                localPosition = Vector3.zero,
+                localEulerAngles = Vector3.zero,
+                localScale = Vector3.one
+            };
         }
 
         private void ClearHeldItem()

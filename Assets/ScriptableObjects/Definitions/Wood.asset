@@ -14,4 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _id: wood
   _displayName: Wood
+  _icon: {fileID: 21300000, guid: 1efa0bf487cb30546a605d9f830d3b73, type: 3}
+  _heldPrefab: {fileID: 8343911251253065090, guid: ecf5397ac6183034cb75cc91fdd27a5d, type: 3}
   _maxStack: 99

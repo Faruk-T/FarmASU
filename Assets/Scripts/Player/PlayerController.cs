@@ -48,6 +48,13 @@ namespace FarmASU.Player
         [Tooltip("Animator component controlling character locomotion.")]
         [SerializeField] private Animator _animator;
 
+        [Header("Pick-Up Animation Tuning")]
+        [Tooltip("Duration in seconds of the pick-up bending animation.")]
+        [SerializeField] private float _pickUpDuration = 0.5f;
+
+        [Tooltip("Forward spine bend angle in degrees during ground pickup.")]
+        [SerializeField] private float _pickUpSpineAngle = 35.0f;
+
         // Internal State
         private CharacterController _characterController;
         private FarmASUInputActions _inputActions;
@@ -55,6 +62,21 @@ namespace FarmASU.Player
         private float _verticalVelocity;
         private Vector2 _moveInput;
         private Vector2 _lookInput;
+        private float _pickUpTimer;
+        private Transform _spineBone;
+        private Transform _rightUpperArmBone;
+
+        public bool IsPickingUp => _pickUpTimer > 0.0f;
+
+        public void PlayPickUpAnimation()
+        {
+            _pickUpTimer = _pickUpDuration;
+
+            if (_animator != null)
+            {
+                _animator.SetTrigger("PickUp");
+            }
+        }
 
         private void Awake()
         {
@@ -102,6 +124,32 @@ namespace FarmASU.Player
             HandleLook();
             HandleMovement();
             UpdateAnimation();
+        }
+
+        private void LateUpdate()
+        {
+            if (_pickUpTimer > 0.0f)
+            {
+                _pickUpTimer -= Time.deltaTime;
+                float progress = 1.0f - Mathf.Clamp01(_pickUpTimer / _pickUpDuration);
+                float bendWeight = Mathf.Sin(progress * Mathf.PI);
+
+                if (_spineBone == null && _animator != null)
+                {
+                    _spineBone = _animator.GetBoneTransform(HumanBodyBones.Spine);
+                    _rightUpperArmBone = _animator.GetBoneTransform(HumanBodyBones.RightUpperArm);
+                }
+
+                if (_spineBone != null)
+                {
+                    _spineBone.localRotation *= Quaternion.Euler(_pickUpSpineAngle * bendWeight, 0f, 0f);
+                }
+
+                if (_rightUpperArmBone != null)
+                {
+                    _rightUpperArmBone.localRotation *= Quaternion.Euler(25f * bendWeight, 0f, -20f * bendWeight);
+                }
+            }
         }
 
         private void UpdateAnimation()
@@ -197,6 +245,7 @@ namespace FarmASU.Player
             bool isSprinting = Keyboard.current != null && (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed);
             float maxMoveSpeed = isSprinting ? _runSpeed : _walkSpeed;
             float targetSpeed = hasMovementInput ? maxMoveSpeed : 0.0f;
+            if (_pickUpTimer > 0.0f) targetSpeed *= 0.15f;
             float accelRate = targetSpeed > _currentSpeed ? _acceleration : _deceleration;
             _currentSpeed = Mathf.MoveTowards(_currentSpeed, targetSpeed, accelRate * Time.deltaTime);
 

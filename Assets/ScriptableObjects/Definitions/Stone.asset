@@ -14,4 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _id: stone
   _displayName: Stone
+  _icon: {fileID: 21300000, guid: 4f69287e72104e64ba393a46d5cc6898, type: 3}
+  _heldPrefab: {fileID: 3987418607047887905, guid: 4fa05318acbe66149abaa254e114164b, type: 3}
   _maxStack: 99

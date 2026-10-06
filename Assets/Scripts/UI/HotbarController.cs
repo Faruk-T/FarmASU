@@ -143,6 +143,18 @@ namespace FarmASU.UI
                 {
                     NotifySelectionChanged();
                 }
+                else
+                {
+                    // If current slot is empty and new item was picked up into hotbar, auto-select it immediately
+                    InventorySlot currentSlot = (_inventory != null && _selectedSlotIndex < _inventory.SlotCount)
+                        ? _inventory.GetSlot(_selectedSlotIndex)
+                        : new InventorySlot(string.Empty, 0);
+
+                    if (currentSlot.IsEmpty && !slot.IsEmpty)
+                    {
+                        SelectSlot(index);
+                    }
+                }
             }
         }
 
