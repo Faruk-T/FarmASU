@@ -17,6 +17,13 @@ namespace FarmASU.Inventory
         [Tooltip("User-facing display name of the item.")]
         [SerializeField] private string _displayName;
 
+        [Header("Visuals")]
+        [Tooltip("2D Icon shown in the Inventory / Hotbar UI.")]
+        [SerializeField] private Sprite _icon;
+
+        [Tooltip("3D Prefab model instantiated in the character's hand when selected.")]
+        [SerializeField] private GameObject _heldPrefab;
+
         [Header("Inventory Properties")]
         [Tooltip("Maximum quantity of this item that can stack in a single inventory slot.")]
         [Range(1, 999)]
@@ -24,16 +31,20 @@ namespace FarmASU.Inventory
 
         public string Id => _id;
         public string DisplayName => string.IsNullOrEmpty(_displayName) ? _id : _displayName;
+        public Sprite Icon => _icon;
+        public GameObject HeldPrefab => _heldPrefab;
         public int MaxStack => Mathf.Max(1, _maxStack);
 
         /// <summary>
         /// Editor helper or runtime initializer for unit tests.
         /// </summary>
-        public void Initialize(string id, string displayName, int maxStack)
+        public void Initialize(string id, string displayName, int maxStack, Sprite icon = null, GameObject heldPrefab = null)
         {
             _id = id;
             _displayName = displayName;
             _maxStack = Mathf.Max(1, maxStack);
+            _icon = icon;
+            _heldPrefab = heldPrefab;
         }
     }
 }
