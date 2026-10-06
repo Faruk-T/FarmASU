@@ -53,7 +53,7 @@ namespace FarmASU.Player
         {
             if (_handMount != null) return;
 
-            if (_animator != null && _animator.isHumanoid)
+            if (_animator != null && _animator.avatar != null && _animator.avatar.isHuman)
             {
                 Transform rightHand = _animator.GetBoneTransform(HumanBodyBones.RightHand);
                 if (rightHand != null)
