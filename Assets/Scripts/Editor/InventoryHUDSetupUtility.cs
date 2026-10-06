@@ -31,7 +31,10 @@ namespace FarmASU.Editor
             // 2. Assign icons to ItemDefinitions
             AssignIconsToItemDefinitions();
 
-            // 3. Ensure Player has InventoryController and HeldItemHandler
+            // 3. Create and assign 3D Held Prefabs (wood log and stone in hand)
+            SetupHeldPrefabs();
+
+            // 4. Ensure Player has InventoryController and HeldItemHandler
             ConfigurePlayerComponents();
 
             // 4. Create or update Canvas_HUD with Hotbar and InteractionPrompt
@@ -186,6 +189,70 @@ namespace FarmASU.Editor
             {
                 SerializedObject so = new SerializedObject(stoneDef);
                 so.FindProperty("_icon").objectReferenceValue = stoneSprite;
+                so.ApplyModifiedProperties();
+                EditorUtility.SetDirty(stoneDef);
+            }
+
+            AssetDatabase.SaveAssets();
+        }
+
+        private const string HeldPrefabsFolder = "Assets/Prefabs/HeldItems";
+
+        private static void SetupHeldPrefabs()
+        {
+            if (!Directory.Exists(HeldPrefabsFolder))
+            {
+                Directory.CreateDirectory(HeldPrefabsFolder);
+                AssetDatabase.Refresh();
+            }
+
+            string woodPrefabPath = $"{HeldPrefabsFolder}/Held_Wood.prefab";
+            string stonePrefabPath = $"{HeldPrefabsFolder}/Held_Stone.prefab";
+
+            // 1. Create Held_Wood prefab from firewood mesh
+            GameObject woodSrc = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Bizulka/Witchs_house/Models/frewood.fbx");
+            if (woodSrc != null && !File.Exists(woodPrefabPath))
+            {
+                GameObject tempWood = Object.Instantiate(woodSrc);
+                tempWood.name = "Held_Wood";
+                tempWood.transform.localScale = new Vector3(0.22f, 0.22f, 0.22f);
+                tempWood.transform.localRotation = Quaternion.Euler(0, 90f, 0);
+                foreach (var c in tempWood.GetComponentsInChildren<Collider>()) Object.DestroyImmediate(c);
+                PrefabUtility.SaveAsPrefabAsset(tempWood, woodPrefabPath);
+                Object.DestroyImmediate(tempWood);
+            }
+
+            // 2. Create Held_Stone prefab from stones mesh
+            GameObject stoneSrc = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Bizulka/Witchs_house/Models/Stones.fbx");
+            if (stoneSrc != null && !File.Exists(stonePrefabPath))
+            {
+                GameObject tempStone = Object.Instantiate(stoneSrc);
+                tempStone.name = "Held_Stone";
+                tempStone.transform.localScale = new Vector3(0.25f, 0.25f, 0.25f);
+                foreach (var c in tempStone.GetComponentsInChildren<Collider>()) Object.DestroyImmediate(c);
+                PrefabUtility.SaveAsPrefabAsset(tempStone, stonePrefabPath);
+                Object.DestroyImmediate(tempStone);
+            }
+
+            AssetDatabase.Refresh();
+
+            // 3. Assign held prefabs to ItemDefinitions
+            GameObject heldWoodPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(woodPrefabPath);
+            ItemDefinition woodDef = AssetDatabase.LoadAssetAtPath<ItemDefinition>($"{DefinitionsFolder}/Wood.asset");
+            if (woodDef != null && heldWoodPrefab != null)
+            {
+                SerializedObject so = new SerializedObject(woodDef);
+                so.FindProperty("_heldPrefab").objectReferenceValue = heldWoodPrefab;
+                so.ApplyModifiedProperties();
+                EditorUtility.SetDirty(woodDef);
+            }
+
+            GameObject heldStonePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(stonePrefabPath);
+            ItemDefinition stoneDef = AssetDatabase.LoadAssetAtPath<ItemDefinition>($"{DefinitionsFolder}/Stone.asset");
+            if (stoneDef != null && heldStonePrefab != null)
+            {
+                SerializedObject so = new SerializedObject(stoneDef);
+                so.FindProperty("_heldPrefab").objectReferenceValue = heldStonePrefab;
                 so.ApplyModifiedProperties();
                 EditorUtility.SetDirty(stoneDef);
             }

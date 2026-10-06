@@ -58,9 +58,15 @@ namespace FarmASU.Player
                 Transform rightHand = _animator.GetBoneTransform(HumanBodyBones.RightHand);
                 if (rightHand != null)
                 {
+                    Transform existing = rightHand.Find("HeldItemMount");
+                    if (existing != null)
+                    {
+                        _handMount = existing;
+                        return;
+                    }
                     GameObject mount = new GameObject("HeldItemMount");
                     mount.transform.SetParent(rightHand, false);
-                    mount.transform.localPosition = new Vector3(0.05f, 0.05f, 0.05f);
+                    mount.transform.localPosition = new Vector3(0.06f, 0.08f, 0.02f);
                     mount.transform.localRotation = Quaternion.Euler(0, 90f, 90f);
                     _handMount = mount.transform;
                     return;
